@@ -24,7 +24,11 @@ bindings/SafeProxyFactory/SafeProxyFactory.go:
 	mkdir -p bindings/SafeProxyFactory
 	seer evm generate --package SafeProxyFactory --output bindings/SafeProxyFactory/SafeProxyFactory.go --hardhat safe-smart-account/build/artifacts/contracts/proxies/SafeProxyFactory.sol/SafeProxyFactory.json --cli --struct SafeProxyFactory
 
-bindings: bindings/Safe/Safe.go bindings/SafeL2/SafeL2.go bindings/SafeProxy/SafeProxy.go bindings/SafeProxyFactory/SafeProxyFactory.go
+bindings/CompatibilityFallbackHandler/CompatibilityFallbackHandler.go:
+	mkdir -p bindings/CompatibilityFallbackHandler
+	seer evm generate --package CompatibilityFallbackHandler --output bindings/CompatibilityFallbackHandler/CompatibilityFallbackHandler.go --hardhat safe-smart-account/build/artifacts/contracts/handler/CompatibilityFallbackHandler.sol/CompatibilityFallbackHandler.json --cli --struct CompatibilityFallbackHandler
+
+bindings: bindings/Safe/Safe.go bindings/SafeL2/SafeL2.go bindings/SafeProxy/SafeProxy.go bindings/SafeProxyFactory/SafeProxyFactory.go bindings/CompatibilityFallbackHandler/CompatibilityFallbackHandler.go
 
 clean:
 	rm -rf bindings/* bin/*
