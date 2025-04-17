@@ -1,125 +1,91 @@
 package main
 
 import (
-	"bytes"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"io"
-	"math/big"
 	"net/http"
-	"strings"
-
-	"github.com/G7DAO/safes/bindings/Safe"
-	"github.com/G7DAO/seer/bindings/GnosisSafe"
-	"github.com/ethereum/go-ethereum/accounts/abi/bind"
-	"github.com/ethereum/go-ethereum/accounts/keystore"
-	"github.com/ethereum/go-ethereum/common"
-	"github.com/ethereum/go-ethereum/crypto"
-	"github.com/ethereum/go-ethereum/ethclient"
+	"net/url"
 )
 
-func CreateSafeProposal(safeAddress common.Address, to string, value string, calldata string, safeOperationType Safe.SafeOperationType, chainID *big.Int, key *keystore.Key, client *ethclient.Client, safeApi string) error {
-	safeInstance, err := GnosisSafe.NewGnosisSafe(safeAddress, client)
+type ProposalResponse struct {
+	Type         string       `json:"type"`
+	Transaction  *Transaction `json:"transaction,omitempty"`  // Only present when type is "TRANSACTION"
+	Timestamp    int64        `json:"timestamp,omitempty"`    // Only present when type is "DATE_LABEL"
+	ConflictType string       `json:"conflictType,omitempty"` // Only present when type is "TRANSACTION"
+}
+
+type Transaction struct {
+	TxInfo        TxInfo        `json:"txInfo"`
+	ID            string        `json:"id"`
+	TxHash        string        `json:"txHash"`
+	Timestamp     int64         `json:"timestamp"`
+	TxStatus      string        `json:"txStatus"`
+	ExecutionInfo ExecutionInfo `json:"executionInfo"`
+	SafeAppInfo   SafeAppInfo   `json:"safeAppInfo"`
+}
+
+type TxInfo struct {
+	Type             string `json:"type"`
+	HumanDescription string `json:"humanDescription"`
+	Creator          Party  `json:"creator"`
+	TransactionHash  string `json:"transactionHash"`
+	Implementation   Party  `json:"implementation"`
+	Factory          Party  `json:"factory"`
+	SaltNonce        string `json:"saltNonce"`
+}
+
+type Party struct {
+	Value   string `json:"value"`
+	Name    string `json:"name"`
+	LogoUri string `json:"logoUri"`
+}
+
+type ExecutionInfo struct {
+	Type                   string  `json:"type"`
+	Nonce                  int     `json:"nonce"`
+	ConfirmationsRequired  int     `json:"confirmationsRequired"`
+	ConfirmationsSubmitted int     `json:"confirmationsSubmitted"`
+	MissingSigners         []Party `json:"missingSigners"`
+}
+
+type SafeAppInfo struct {
+	Name    string `json:"name"`
+	URL     string `json:"url"`
+	LogoUri string `json:"logoUri"`
+}
+
+func GetProposals(apiURL string) ([]ProposalResponse, error) {
+	baseURL, err := url.Parse(apiURL)
 	if err != nil {
-		return fmt.Errorf("failed to create GnosisSafe instance: %w", err)
+		return nil, fmt.Errorf("error parsing URL: %w", err)
 	}
-
-	nonce, err := safeInstance.Nonce(&bind.CallOpts{})
+	fmt.Println(baseURL.String())
+	resp, err := http.Get(baseURL.String())
 	if err != nil {
-		return fmt.Errorf("failed to fetch nonce: %w", err)
-	}
-
-	txData := Safe.SafeTransactionData{
-		To:             to,
-		Value:          value,
-		Data:           calldata,
-		Operation:      safeOperationType,
-		SafeTxGas:      0,
-		BaseGas:        0,
-		GasPrice:       "0",
-		GasToken:       Safe.NativeTokenAddress,
-		RefundReceiver: Safe.NativeTokenAddress,
-		Nonce:          nonce,
-	}
-
-	// Compute the hash of the transaction for signing
-	safeTxHash, err := Safe.CalculateSafeTxHash(safeAddress, txData, chainID)
-	if err != nil {
-		return fmt.Errorf("failed to calculate SafeTxHash: %w", err)
-	}
-
-	// Sign the hash with the user's private key
-	signature, err := crypto.Sign(safeTxHash.Bytes(), key.PrivateKey)
-	if err != nil {
-		return fmt.Errorf("failed to sign SafeTxHash: %w", err)
-	}
-
-	// Adjust the V value for Ethereum signature replay protection
-	signature[64] += 27
-	senderSignature := "0x" + common.Bytes2Hex(signature)
-
-	requestBody := map[string]interface{}{
-		"to":             txData.To,
-		"value":          txData.Value,
-		"data":           "0x" + txData.Data,
-		"operation":      int(txData.Operation),
-		"safeTxGas":      fmt.Sprintf("%d", txData.SafeTxGas),
-		"baseGas":        fmt.Sprintf("%d", txData.BaseGas),
-		"gasPrice":       txData.GasPrice,
-		"gasToken":       txData.GasToken,
-		"refundReceiver": txData.RefundReceiver,
-		"nonce":          fmt.Sprintf("%d", txData.Nonce),
-		"safeTxHash":     safeTxHash.Hex(),
-		"sender":         key.Address.Hex(),
-		"signature":      senderSignature,
-		"origin":         fmt.Sprintf("{\"url\":\"%s\",\"name\":\"SafeProposal Creation\"}", safeApi),
-	}
-
-	jsonBody, err := json.Marshal(requestBody)
-	if err != nil {
-		return fmt.Errorf("failed to marshal request body: %w", err)
-	}
-
-	req, err := http.NewRequest("POST", safeApi, bytes.NewBuffer(jsonBody))
-	if err != nil {
-		return fmt.Errorf("failed to create HTTP request: %w", err)
-	}
-	req.Header.Set("Content-Type", "application/json")
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return fmt.Errorf("failed to send HTTP request: %w", err)
+		return nil, fmt.Errorf("error sending request: %w", err)
 	}
 	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		body, _ := io.ReadAll(resp.Body)
-		var jsonErr interface{}
-		if err := json.Unmarshal(body, &jsonErr); err != nil {
-			return fmt.Errorf("HTTP %d, failed to parse error body: %s", resp.StatusCode, string(body))
-		}
-		formatted, _ := json.MarshalIndent(jsonErr, "", "  ")
-		return fmt.Errorf("HTTP %d, error response:\n%s", resp.StatusCode, formatted)
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
 	}
 
-	fmt.Println("Safe proposal created successfully")
-	return nil
-}
-
-func IsValidHex(s string) bool {
-	if strings.HasPrefix(s, "0x") || strings.HasPrefix(s, "0X") {
-		s = s[2:]
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("error reading response body: %w", err)
 	}
 
-	if len(s) == 0 {
-		return false
+	var response struct {
+		Count    int                `json:"count"`
+		Next     *string            `json:"next"`
+		Previous *string            `json:"previous"`
+		Results  []ProposalResponse `json:"results"`
 	}
 
-	if len(s)%2 != 0 {
-		return false
+	err = json.Unmarshal(body, &response)
+	if err != nil {
+		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
-
-	_, err := hex.DecodeString(s)
-	return err == nil
+	return response.Results, nil
 }
