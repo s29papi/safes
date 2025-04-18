@@ -68,7 +68,7 @@ func GetProposals(apiURL string) ([]ProposalResponse, error) {
 	if err != nil {
 		return nil, fmt.Errorf("error parsing URL: %w", err)
 	}
-	fmt.Println(baseURL.String())
+
 	resp, err := http.Get(baseURL.String())
 	if err != nil {
 		return nil, fmt.Errorf("error sending request: %w", err)
@@ -90,8 +90,6 @@ func GetProposals(apiURL string) ([]ProposalResponse, error) {
 		Previous *string            `json:"previous"`
 		Results  []ProposalResponse `json:"results"`
 	}
-
-	// fmt.Println(string(body))
 
 	err = json.Unmarshal(body, &response)
 	if err != nil {
