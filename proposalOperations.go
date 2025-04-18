@@ -8,51 +8,59 @@ import (
 	"net/url"
 )
 
+type Confirmation struct {
+	Owner           string  `json:"owner"`
+	SubmissionDate  string  `json:"submissionDate"`
+	TransactionHash *string `json:"transactionHash"`
+	Signature       string  `json:"signature"`
+	SignatureType   string  `json:"signatureType"`
+}
+
+type DataDecoded struct {
+	Method     string      `json:"method"`
+	Parameters []Parameter `json:"parameters"`
+	Accuracy   string      `json:"accuracy"`
+}
+
+type Parameter struct {
+	Name  string `json:"name"`
+	Type  string `json:"type"`
+	Value any    `json:"value"`
+}
+
 type ProposalResponse struct {
-	Type         string       `json:"type"`
-	Transaction  *Transaction `json:"transaction,omitempty"`  // Only present when type is "TRANSACTION"
-	Timestamp    int64        `json:"timestamp,omitempty"`    // Only present when type is "DATE_LABEL"
-	ConflictType string       `json:"conflictType,omitempty"` // Only present when type is "TRANSACTION"
-}
-
-type Transaction struct {
-	TxInfo        TxInfo        `json:"txInfo"`
-	ID            string        `json:"id"`
-	TxHash        string        `json:"txHash"`
-	Timestamp     int64         `json:"timestamp"`
-	TxStatus      string        `json:"txStatus"`
-	ExecutionInfo ExecutionInfo `json:"executionInfo"`
-	SafeAppInfo   SafeAppInfo   `json:"safeAppInfo"`
-}
-
-type TxInfo struct {
-	Type             string `json:"type"`
-	HumanDescription string `json:"humanDescription"`
-	Creator          Party  `json:"creator"`
-	TransactionHash  string `json:"transactionHash"`
-	Implementation   Party  `json:"implementation"`
-	Factory          Party  `json:"factory"`
-	SaltNonce        string `json:"saltNonce"`
-}
-
-type Party struct {
-	Value   string `json:"value"`
-	Name    string `json:"name"`
-	LogoUri string `json:"logoUri"`
-}
-
-type ExecutionInfo struct {
-	Type                   string  `json:"type"`
-	Nonce                  int     `json:"nonce"`
-	ConfirmationsRequired  int     `json:"confirmationsRequired"`
-	ConfirmationsSubmitted int     `json:"confirmationsSubmitted"`
-	MissingSigners         []Party `json:"missingSigners"`
-}
-
-type SafeAppInfo struct {
-	Name    string `json:"name"`
-	URL     string `json:"url"`
-	LogoUri string `json:"logoUri"`
+	Safe                  string         `json:"safe"`
+	To                    string         `json:"to"`
+	Value                 string         `json:"value"`
+	Data                  *string        `json:"data"`
+	Operation             int            `json:"operation"`
+	GasToken              string         `json:"gasToken"`
+	SafeTxGas             int            `json:"safeTxGas"`
+	BaseGas               int            `json:"baseGas"`
+	GasPrice              string         `json:"gasPrice"`
+	RefundReceiver        string         `json:"refundReceiver"`
+	Nonce                 int            `json:"nonce"`
+	ExecutionDate         string         `json:"executionDate"`
+	SubmissionDate        string         `json:"submissionDate"`
+	Modified              string         `json:"modified"`
+	BlockNumber           int            `json:"blockNumber"`
+	TransactionHash       string         `json:"transactionHash"`
+	SafeTxHash            string         `json:"safeTxHash"`
+	Proposer              string         `json:"proposer"`
+	Executor              string         `json:"executor"`
+	IsExecuted            bool           `json:"isExecuted"`
+	IsSuccessful          bool           `json:"isSuccessful"`
+	EthGasPrice           string         `json:"ethGasPrice"`
+	MaxFeePerGas          string         `json:"maxFeePerGas"`
+	MaxPriorityFeePerGas  string         `json:"maxPriorityFeePerGas"`
+	GasUsed               int            `json:"gasUsed"`
+	Fee                   string         `json:"fee"`
+	Origin                string         `json:"origin"`
+	DataDecoded           *DataDecoded   `json:"dataDecoded"`
+	ConfirmationsRequired int            `json:"confirmationsRequired"`
+	Confirmations         []Confirmation `json:"confirmations"`
+	Trusted               bool           `json:"trusted"`
+	Signatures            string         `json:"signatures"`
 }
 
 func GetProposals(apiURL string) ([]ProposalResponse, error) {
@@ -83,9 +91,18 @@ func GetProposals(apiURL string) ([]ProposalResponse, error) {
 		Results  []ProposalResponse `json:"results"`
 	}
 
+	// fmt.Println(string(body))
+
 	err = json.Unmarshal(body, &response)
 	if err != nil {
 		return nil, fmt.Errorf("error unmarshaling response: %w", err)
 	}
 	return response.Results, nil
+}
+
+func nullableString(s *string) string {
+	if s == nil {
+		return "<nil>"
+	}
+	return *s
 }

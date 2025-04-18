@@ -45,7 +45,7 @@ func createListProposalsCmd() *cobra.Command {
 				return fmt.Errorf("failed to get chain ID: %v", err)
 			}
 			if safeAPIURL == "" {
-				safeAPIURL = fmt.Sprintf("https://safe-client.safe.global/v1/chains/%s/safes/%s/transactions/history/", chainID.String(), safe)
+				safeAPIURL = fmt.Sprintf("https://safe-client.safe.global/v1/chains/%s/safes/%s/multisig-transactions/raw", chainID.String(), safe)
 				fmt.Println("safe-api is not set, using default: ", safeAPIURL)
 			}
 
@@ -57,62 +57,60 @@ func createListProposalsCmd() *cobra.Command {
 				return fmt.Errorf("no proposals found")
 			} else {
 				var count int64
-				for _, d := range proposals {
-					if d.Type != "TRANSACTION" {
-						continue
-					}
-					count += 1
-					cmd.Println("------------------------------------------------------------------------------------------------")
-					cmd.Printf("Type: %s\n", d.Type)
-					cmd.Printf("Proposal Count #%d:\n", count)
+				for _, tx := range proposals {
+					count++
+					cmd.Println("================================================================================================")
+					cmd.Printf("Proposal count #%d\n", count)
+					cmd.Printf("Safe Address: %s\n", tx.Safe)
+					cmd.Printf("To: %s\n", tx.To)
+					cmd.Printf("Value: %s\n", tx.Value)
+					cmd.Printf("Data:            %s\n", nullableString(tx.Data))
+					cmd.Printf("Operation: %d\n", tx.Operation)
+					cmd.Printf("Gas Token: %s\n", tx.GasToken)
+					cmd.Printf("SafeTxGas: %d\n", tx.SafeTxGas)
+					cmd.Printf("BaseGas: %d\n", tx.BaseGas)
+					cmd.Printf("Gas Price: %s\n", tx.GasPrice)
+					cmd.Printf("Refund Receiver: %s\n", tx.RefundReceiver)
+					cmd.Printf("Nonce: %d\n", tx.Nonce)
+					cmd.Printf("Execution Date: %s\n", tx.ExecutionDate)
+					cmd.Printf("Submission Date: %s\n", tx.SubmissionDate)
+					cmd.Printf("Modified: %s\n", tx.Modified)
+					cmd.Printf("Block Number: %d\n", tx.BlockNumber)
+					cmd.Printf("Transaction Hash: %s\n", tx.TransactionHash)
+					cmd.Printf("SafeTxHash: %s\n", tx.SafeTxHash)
+					cmd.Printf("Proposer: %s\n", tx.Proposer)
+					cmd.Printf("Executor: %s\n", tx.Executor)
+					cmd.Printf("Is Executed: %v\n", tx.IsExecuted)
+					cmd.Printf("Is Successful: %v\n", tx.IsSuccessful)
+					cmd.Printf("ETH Gas Price: %s\n", tx.EthGasPrice)
+					cmd.Printf("Max Fee Per Gas: %s\n", tx.MaxFeePerGas)
+					cmd.Printf("Max Priority Fee Per Gas: %s\n", tx.MaxPriorityFeePerGas)
+					cmd.Printf("Gas Used: %d\n", tx.GasUsed)
+					cmd.Printf("Fee: %s\n", tx.Fee)
+					cmd.Printf("Origin: %s\n", tx.Origin)
+					cmd.Printf("Data Decoded:    %s\n", tx.DataDecoded)
+					cmd.Printf("Confirmations Required: %d\n", tx.ConfirmationsRequired)
+					cmd.Printf("Trusted: %v\n", tx.Trusted)
+					cmd.Printf("Signatures: %s\n", tx.Signatures)
 
-					if d.Transaction != nil {
-						cmd.Printf("  Transaction ID: %s\n", d.Transaction.ID)
-						cmd.Printf("  Transaction Hash: %s\n", d.Transaction.TxHash)
-						cmd.Printf("  Transaction Status: %s\n", d.Transaction.TxStatus)
-						cmd.Printf("  Transaction Timestamp: %d\n", d.Transaction.Timestamp)
-
-						cmd.Println("\n  Transaction Info:")
-						cmd.Printf("    Type: %s\n", d.Transaction.TxInfo.Type)
-						cmd.Printf("    Description: %s\n", d.Transaction.TxInfo.HumanDescription)
-						cmd.Printf("    Creator: %s (%s)\n", d.Transaction.TxInfo.Creator.Name, d.Transaction.TxInfo.Creator.Value)
-						cmd.Printf("    Creator Logo URI: %s\n", d.Transaction.TxInfo.Creator.LogoUri)
-						cmd.Printf("    Implementation: %s (%s)\n", d.Transaction.TxInfo.Implementation.Name, d.Transaction.TxInfo.Implementation.Value)
-						cmd.Printf("    Implementation Logo URI: %s\n", d.Transaction.TxInfo.Implementation.LogoUri)
-						cmd.Printf("    Factory: %s (%s)\n", d.Transaction.TxInfo.Factory.Name, d.Transaction.TxInfo.Factory.Value)
-						cmd.Printf("    Factory Logo URI: %s\n", d.Transaction.TxInfo.Factory.LogoUri)
-						cmd.Printf("    Salt Nonce: %s\n", d.Transaction.TxInfo.SaltNonce)
-
-						cmd.Println("\n  Execution Info:")
-						cmd.Printf("    Type: %s\n", d.Transaction.ExecutionInfo.Type)
-						cmd.Printf("    Nonce: %d\n", d.Transaction.ExecutionInfo.Nonce)
-						cmd.Printf("    Required Confirmations: %d/%d\n",
-							d.Transaction.ExecutionInfo.ConfirmationsSubmitted,
-							d.Transaction.ExecutionInfo.ConfirmationsRequired)
-
-						if len(d.Transaction.ExecutionInfo.MissingSigners) > 0 {
-							cmd.Println("    Missing Signers:")
-							for _, signer := range d.Transaction.ExecutionInfo.MissingSigners {
-								cmd.Printf("      - Name: %s\n", signer.Name)
-								cmd.Printf("        Value: %s\n", signer.Value)
-								cmd.Printf("        LogoUri: %s\n", signer.LogoUri)
-							}
-						}
-
-						if d.Transaction.SafeAppInfo.Name != "" {
-							cmd.Println("\n  Safe App Info:")
-							cmd.Printf("    Name: %s\n", d.Transaction.SafeAppInfo.Name)
-							cmd.Printf("    URL: %s\n", d.Transaction.SafeAppInfo.URL)
-							cmd.Printf("    LogoUri: %s\n", d.Transaction.SafeAppInfo.LogoUri)
-						}
+					cmd.Println("\nConfirmations:")
+					if len(tx.Confirmations) == 0 {
+						cmd.Println("  None")
 					} else {
-						cmd.Printf("  Timestamp: %d\n", d.Timestamp)
+						for i, c := range tx.Confirmations {
+							cmd.Printf("  [%d] Owner: %s\n", i+1, c.Owner)
+							cmd.Printf("      Submission Date: %s\n", c.SubmissionDate)
+							if c.TransactionHash != nil {
+								cmd.Printf("      Transaction Hash: %s\n", nullableString(c.TransactionHash))
+							} else {
+								cmd.Println("      Transaction Hash: <nil>")
+							}
+							cmd.Printf("      Signature: %s\n", c.Signature)
+							cmd.Printf("      Signature Type: %s\n", c.SignatureType)
+						}
 					}
-
-					cmd.Printf("  Conflict Type: %s\n", d.ConflictType)
-					cmd.Println("------------------------------------------------------------------------------------------------")
+					cmd.Println("================================================================================================")
 				}
-
 			}
 			return nil
 		},
